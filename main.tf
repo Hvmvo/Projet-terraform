@@ -142,7 +142,7 @@ resource "azurerm_linux_virtual_machine" "nginx_vm" {
 
   admin_ssh_key {
     username   = "adminuser"
-    public_key = file("yourkeySSH") # Spécifiez le chemin vers votre clé publique SSH
+    public_key = file("C:/Users/Ismail/.ssh/id_rsa.pub") # Spécifiez le chemin vers votre clé publique SSH
   }
 
   network_interface_ids = [azurerm_network_interface.nginx_nic.id]
@@ -187,7 +187,7 @@ resource "aws_vpc" "production-vpc" {
 resource "aws_subnet" "production-subnet-1" {
   vpc_id     = aws_vpc.production-vpc.id
   cidr_block = "10.0.1.0/24"
-  availability_zone = "eu-central-1a"
+  availability_zone = "eu-west-1"
 }
 
 resource "aws_internet_gateway" "production-ig" {
@@ -250,7 +250,7 @@ resource "aws_network_interface" "production-ec2-1-NI" {
 }
 
 resource "aws_eip" "production-eip" {
-  domain                    = true
+  domain                    = "vpc"
   network_interface         =  aws_network_interface.production-ec2-1-NI.id
   associate_with_private_ip = "10.0.1.50"
 }
@@ -274,7 +274,7 @@ data "aws_ami" "ubuntu" {
 resource "aws_instance" "web" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = "t2.micro"
-  availability_zone = "eu-central-1a"
+  availability_zone = "eu-west-1"
   network_interface {
     network_interface_id = aws_network_interface.production-ec2-1-NI.id
     device_index = 0
