@@ -142,7 +142,7 @@ resource "azurerm_linux_virtual_machine" "nginx_vm" {
 
   admin_ssh_key {
     username   = "adminuser"
-    public_key = file("C:/Users/Ismail/.ssh/id_rsa.pub") # Spécifiez le chemin vers votre clé publique SSH
+    public_key = file("YourSSHKey") # Spécifiez le chemin vers votre clé publique SSH
   }
 
   network_interface_ids = [azurerm_network_interface.nginx_nic.id]
