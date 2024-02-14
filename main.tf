@@ -16,7 +16,7 @@ provider "azurerm" {
 }
 
 provider "aws" {
-  region = "eu-west-1"  # Spécifiez la région AWS souhaitée
+  region = "eu-west-1" # Spécifiez la région AWS souhaitée
 }
 # Création d'un groupe de ressources en Europe (West Europe)
 resource "azurerm_resource_group" "nginx_rg" {
@@ -133,16 +133,16 @@ resource "azurerm_network_security_group" "nginx_nsg" {
 
 # Création d'une machine virtuelle en Europe (West Europe) avec SSH
 resource "azurerm_linux_virtual_machine" "nginx_vm" {
-  name                = "nginx-vm"
-  resource_group_name = azurerm_resource_group.nginx_rg.name
-  location            = "West Europe"
-  size                = "Standard_F2"
-  admin_username      = "adminuser"
+  name                            = "nginx-vm"
+  resource_group_name             = azurerm_resource_group.nginx_rg.name
+  location                        = "West Europe"
+  size                            = "Standard_F2"
+  admin_username                  = "adminuser"
   disable_password_authentication = true # Désactive l'authentification par mot de passe
 
   admin_ssh_key {
     username   = "adminuser"
-    public_key = file("YourSSHKey") # Spécifiez le chemin vers votre clé publique SSH
+    public_key = file("C:/Users/Ismail/.ssh/id_rsa.pub") # Spécifiez le chemin vers votre clé publique SSH
   }
 
   network_interface_ids = [azurerm_network_interface.nginx_nic.id]
@@ -157,7 +157,7 @@ resource "azurerm_linux_virtual_machine" "nginx_vm" {
     version   = "latest"
   }
 
-  computer_name  = "nginxvm" # Nom de la VM
+  computer_name = "nginxvm" # Nom de la VM
 
   custom_data = base64encode(<<-EOF
                 #cloud-config
@@ -185,9 +185,9 @@ resource "aws_vpc" "production-vpc" {
 }
 
 resource "aws_subnet" "production-subnet-1" {
-  vpc_id     = aws_vpc.production-vpc.id
-  cidr_block = "10.0.1.0/24"
-  availability_zone = "eu-west-1"
+  vpc_id            = aws_vpc.production-vpc.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "eu-west-1a"
 }
 
 resource "aws_internet_gateway" "production-ig" {
@@ -202,35 +202,43 @@ resource "aws_route_table" "production-subnet-1-route-table" {
     gateway_id = aws_internet_gateway.production-ig.id
   }
   route {
-    ipv6_cidr_block        = "::/0"
-    gateway_id = aws_internet_gateway.production-ig.id
+    ipv6_cidr_block = "::/0"
+    gateway_id      = aws_internet_gateway.production-ig.id
   }
 }
-
+# Configuration de la table de routage et association au sous-réseau pour le routage du trafic.
 resource "aws_route_table_association" "production-subnet-1-association-1" {
   subnet_id      = aws_subnet.production-subnet-1.id
   route_table_id = aws_route_table.production-subnet-1-route-table.id
 }
-
+# Création d'un groupe de sécurité pour contrôler l'accès à l'instance EC2 via les ports HTTP et HTTPS.
 resource "aws_security_group" "production-security-group" {
   name        = "allow_all"
   description = "Allow All Traffic"
   vpc_id      = aws_vpc.production-vpc.id
 
   ingress {
-    description      = "HTTPS"
-    from_port        = 443
-    to_port          = 443
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description      = "HTTP"
-    from_port        = 80
-    to_port          = 80
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Ajustez cette valeur pour restreindre l'accès à certaines adresses IP
+  }
+
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -242,7 +250,7 @@ resource "aws_security_group" "production-security-group" {
     # ALLOW ALL
   }
 }
-
+# Allocation d'une adresse IP élastique et association avec une interface réseau pour l'instance EC2.
 resource "aws_network_interface" "production-ec2-1-NI" {
   subnet_id       = aws_subnet.production-subnet-1.id
   private_ips     = ["10.0.1.50"]
@@ -251,10 +259,10 @@ resource "aws_network_interface" "production-ec2-1-NI" {
 
 resource "aws_eip" "production-eip" {
   domain                    = "vpc"
-  network_interface         =  aws_network_interface.production-ec2-1-NI.id
+  network_interface         = aws_network_interface.production-ec2-1-NI.id
   associate_with_private_ip = "10.0.1.50"
 }
-
+# Définition et recherche de l'AMI Ubuntu la plus récente pour l'instance EC2.
 data "aws_ami" "ubuntu" {
   most_recent = true
 
@@ -270,23 +278,37 @@ data "aws_ami" "ubuntu" {
 
   owners = ["099720109477"] # Canonical
 }
-
+# Déploiement d'une instance EC2 dans AWS, avec configuration pour l'exécution de Nginx.
 resource "aws_instance" "web" {
-  ami           = data.aws_ami.ubuntu.id
-  instance_type = "t2.micro"
-  availability_zone = "eu-west-1"
+  ami               = data.aws_ami.ubuntu.id
+  instance_type     = "t2.micro"
+  availability_zone = "eu-west-1a"
   network_interface {
     network_interface_id = aws_network_interface.production-ec2-1-NI.id
-    device_index = 0
+    device_index         = 0
   }
   user_data = <<-EOF
-              #!bin/bash
-              sudo apt update -y
-              sudo apt install nginx -y
-              sudo systemctl start nginx
-              EOF
+                #!/bin/bash
+                # Mise à jour des paquets et installation de Nginx
+                sudo apt update -y
+                sudo apt install nginx -y
+                sudo systemctl start nginx
+                
+                # Ajout de l'utilisateur adminuser
+                sudo adduser --disabled-password --gecos "" adminuser
+                
+                # Configuration des clés SSH pour adminuser
+                sudo mkdir /home/adminuser/.ssh
+                sudo chmod 700 /home/adminuser/.ssh
+                echo 'ssh-rsa AAAA' > /home/adminuser/.ssh/authorized_keys
+                sudo chmod 600 /home/adminuser/.ssh/authorized_keys
+                sudo chown -R adminuser:adminuser /home/adminuser/.ssh
+                EOF
 }
 
+
+
+# Sortie affichant l'adresse IP publique de l'instance EC2 pour accès externe.
 output "public-ip" {
   value = aws_eip.production-eip.public_ip
 }
